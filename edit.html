@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Пузырьки — настройки</title>
+  <style>
+    .cfg { font: 14px/1.4 Inter, system-ui, Arial; color: #111; max-width: 760px; margin: 20px auto; padding: 0 12px; }
+    .cfg h1 { font-size: 22px; margin: 0 0 4px; }
+    .cfg h2 { font-size: 16px; margin: 18px 0 8px; }
+    .row { display: grid; grid-template-columns: 200px 1fr; gap: 10px; align-items: center; margin: 8px 0; }
+    .row input[type="text"], .row select { padding: 9px 12px; border: 1px solid #ddd; border-radius: 10px; width: 100%; }
+    .row input[type="range"] { width: 100%; }
+    .actions { display:flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+    .btn { background:#111827; color:#fff; border:0; padding:10px 14px; border-radius: 12px; cursor: pointer; }
+    .hint { font-size: 12px; opacity: .7; }
+    .urlbox { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 10px; }
+  </style>
+</head>
+<body>
+  <div class="cfg">
+    <h1>Пузырьки — настройки</h1>
+    <div class="hint">Соберите ссылку на <b>index.html</b> с нужным оформлением и фидбеком. Эту ссылку вставьте в Genially как источник iframe.</div>
+
+    <h2>Оформление</h2>
+    <div class="row">
+      <label>Тема</label>
+      <select id="theme">
+        <option value="witchy">Witchy</option>
+        <option value="neon">Neon</option>
+        <option value="rainbow">Rainbow</option>
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+      </select>
+    </div>
+
+    <h2>Фидбек</h2>
+    <div class="row">
+      <label>Режим</label>
+      <select id="fbMode">
+        <option value="both">Картинка + текст</option>
+        <option value="image">Только картинка</option>
+        <option value="text">Только текст</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>Заголовок</label>
+      <input type="text" id="fbTitle" placeholder="Well done!" />
+    </div>
+    <div class="row">
+      <label>Текст</label>
+      <input type="text" id="fbText" placeholder="Ты нашёл(а) все задания! Отличная работа!" />
+    </div>
+    <div class="row">
+      <label>Картинка (URL)</label>
+      <input type="text" id="fbImage" placeholder="https://.../treasure.png" />
+    </div>
+    <div class="row">
+      <label>Звук (URL или open.mp3)</label>
+      <input type="text" id="fbSound" placeholder="open.mp3" />
+    </div>
+    <div class="row">
+      <label>Громкость</label>
+      <input type="range" id="fbVolume" min="0" max="1" step="0.05" value="0.8" />
+    </div>
+    <div class="row">
+      <label>Выключить звук</label>
+      <select id="fbMute">
+        <option value="0">Нет</option>
+        <option value="1">Да</option>
+      </select>
+    </div>
+
+    <h2>Ссылка для index.html</h2>
+    <div class="row">
+      <label class="hint">Сгенерированный URL</label>
+      <input type="text" id="resultUrl" class="urlbox" readonly />
+    </div>
+    <div class="actions">
+      <button class="btn" id="build">Сгенерировать ссылку</button>
+      <button class="btn" id="copy">Копировать</button>
+      <a class="btn" id="open" target="_blank" rel="noopener">Открыть</a>
+    </div>
+  </div>
+
+  <script>
+    const $ = s => document.querySelector(s);
+    const fields = ['theme','fbMode','fbTitle','fbText','fbImage','fbSound','fbVolume','fbMute'];
+
+    function loadState(){
+      try{
+        const saved = JSON.parse(localStorage.getItem('pusyriki_editor') || '{}');
+        for (const k of fields){ if (saved[k] != null) $('#'+k).value = saved[k]; }
+      }catch(e){}
+    }
+    function saveState(){
+      const st = {};
+      for (const k of fields){ st[k] = $('#'+k).value; }
+      localStorage.setItem('pusyriki_editor', JSON.stringify(st));
+    }
+
+    function buildUrl(){
+      const base = 'index.html';
+      const p = new URLSearchParams();
+      p.set('theme',   $('#theme').value);
+      p.set('fbMode',  $('#fbMode').value);
+      if ($('#fbTitle').value) p.set('fbTitle', $('#fbTitle').value);
+      if ($('#fbText').value)  p.set('fbText',  $('#fbText').value);
+      if ($('#fbImage').value) p.set('fbImage', $('#fbImage').value);
+      if ($('#fbSound').value) p.set('fbSound', $('#fbSound').value);
+      p.set('fbVolume', $('#fbVolume').value);
+      p.set('fbMute',   $('#fbMute').value);
+      $('#resultUrl').value = base + '?' + p.toString();
+      $('#open').href = $('#resultUrl').value;
+      saveState();
+    }
+
+    $('#build').addEventListener('click', buildUrl);
+    $('#copy').addEventListener('click', async ()=>{
+      if (!$('#resultUrl').value) buildUrl();
+      try {
+        await navigator.clipboard.writeText($('#resultUrl').value);
+        $('#copy').textContent = 'Скопировано!';
+        setTimeout(()=>$('#copy').textContent='Копировать', 1200);
+      } catch(e){}
+    });
+
+    document.addEventListener('input', (e)=>{
+      if (['SELECT','INPUT'].includes(e.target.tagName)) buildUrl();
+    });
+
+    loadState();
+    buildUrl();
+  </script>
+</body>
+</html>
