@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Пузырьки v2</title>
+  <style>
+    /* --- базовые стили игры (как обычно) --- */
+    :root {
+      --bg: #0b0b10;
+      --text: #fff;
+      --accent: #7c3aed;
+    }
+    html,body { height: 100%; margin: 0; }
+    body { background: var(--bg); color: var(--text); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; overflow: hidden; }
+
+    .stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .task-card {
+      position: absolute; left: 50%; top: 24px; transform: translateX(-50%);
+      background: rgba(12,12,17,.72);
+      border: 1px solid rgba(255,255,255,.12);
+      backdrop-filter: blur(8px);
+      border-radius: 16px;
+      padding: 12px 16px;
+      max-width: min(92vw, 680px);
+      text-align: center;
+      font-size: clamp(14px, 2vw, 18px);
+      box-shadow: 0 12px 30px rgba(0,0,0,.35);
+    }
+
+    .bubble {
+      position: absolute;
+      width: 80px; height: 80px; border-radius: 999px;
+      background: radial-gradient(ellipse at 30% 30%, rgba(255,255,255,.35), rgba(255,255,255,.05) 60%, rgba(255,255,255,0) 70%),
+                  rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.22);
+      box-shadow: inset 0 0 20px rgba(255,255,255,.12), 0 6px 20px rgba(0,0,0,.35);
+      cursor: pointer;
+      display: grid; place-items: center;
+      color: #fff; font-weight: 700; letter-spacing: .2px;
+      transition: transform .08s ease;
+    }
+    .bubble:active { transform: scale(.96); }
+
+    .counter {
+      position: absolute; left: 16px; top: 16px;
+      background: rgba(12,12,17,.72);
+      border: 1px solid rgba(255,255,255,.12);
+      backdrop-filter: blur(8px);
+      border-radius: 14px;
+      padding: 8px 12px;
+      font-weight: 700;
+      box-shadow: 0 10px 24px rgba(0,0,0,.35);
+    }
+
+    /* Анимация "лоп" */
+    @keyframes popFade {
+      0% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(1.25); opacity: 0; }
+    }
+    .popped { animation: popFade .18s ease forwards; }
+
+    /* ---------- Feedback module v2 (интеграция) ---------- */
+    :root {
+      --fb-bg: rgba(0,0,0,0.7);
+      --fb-card-bg: #0f0f12;
+      --fb-text: #ffffff;
+      --fb-accent: #7c3aed;
+      --fb-border: rgba(255,255,255,0.2);
+      --fb-shadow: 0 20px 40px rgba(0,0,0,0.4);
+      --fb-radius: 20px;
+      --fb-font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial;
+    }
+    .theme-light { --fb-bg: rgba(255,255,255,0.7); --fb-card-bg: #ffffff; --fb-text:#111827; --fb-accent:#2563eb; --fb-border: rgba(0,0,0,0.08); }
+    .theme-dark  { --fb-bg: rgba(0,0,0,0.7);  --fb-card-bg: #0f0f12; --fb-text:#ffffff; --fb-accent:#7c3aed; --fb-border: rgba(255,255,255,0.12); }
+    .theme-neon  { --fb-card-bg: #0a0b11; --fb-accent:#22d3ee; --fb-border: rgba(34,211,238,0.35); }
+    .theme-rainbow { --fb-card-bg:#0b0b10; --fb-accent: #ff6ec7; --fb-border: rgba(255,255,255,0.25); }
+    .theme-witchy { --fb-card-bg:#0d0a0f; --fb-accent:#9b5de5; --fb-border: rgba(155,93,229,0.35); }
+
+    #feedback-overlay {
+      position: fixed; inset: 0; display: none; place-items: center; z-index: 9999;
+      background: var(--fb-bg);
+      font-family: var(--fb-font);
+    }
+    #feedback-overlay.active { display: grid; }
+    .fb-card {
+      width: min(92vw, 680px);
+      background: var(--fb-card-bg);
+      color: var(--fb-text);
+      border: 1px solid var(--fb-border);
+      border-radius: var(--fb-radius);
+      box-shadow: var(--fb-shadow);
+      padding: 24px;
+      text-align: center;
+      position: relative;
+    }
+    .fb-title {
+      font-size: clamp(22px, 2.6vw, 28px);
+      font-weight: 800;
+      letter-spacing: 0.2px;
+      margin: 2px 0 10px;
+    }
+    .fb-text {
+      font-size: clamp(16px, 2vw, 18px);
+      line-height: 1.35;
+      opacity: .95;
+      margin: 0 auto 12px;
+      max-width: 56ch;
+    }
+    .fb-image-wrap { margin: 10px 0 12px; }
+    .fb-image {
+      max-width: 100%; height: auto; border-radius: 14px;
+      border: 1px solid var(--fb-border);
+    }
+    .fb-close {
+      margin-top: 8px;
+      display: inline-flex; align-items:center; gap:8px;
+      padding: 10px 14px; border-radius: 12px; cursor: pointer;
+      background: var(--fb-accent); color: #0b0b10; border: none; font-weight: 700;
+    }
+    .theme-neon .fb-card { box-shadow: 0 0 0 1px rgba(34,211,238,0.3), 0 12px 40px rgba(34,211,238,0.25); }
+    .theme-rainbow .fb-card { box-shadow: 0 0 0 2px rgba(255,110,199,0.35), 0 12px 40px rgba(255,110,199,0.25); }
+    .theme-witchy .fb-card { box-shadow: 0 0 0 2px rgba(155,93,229,0.35), 0 12px 40px rgba(155,93,229,0.25); }
+    /* ---------- /Feedback module v2 ---------- */
+  </style>
+</head>
+<body>
+  <div class="stage" id="stage" aria-live="polite">
+    <div class="counter" id="counter">0 / 10</div>
+    <div class="task-card" id="task">Нажимай на пузырьки, чтобы открыть задания!</div>
+  </div>
+
+  <!-- звуки (имена как раньше) -->
+  <audio id="pop-audio" src="pop.mp3" preload="auto"></audio>
+  <audio id="open-audio" src="open.mp3" preload="auto"></audio>
+
+  <!-- ---------- Feedback module v2 ---------- -->
+  <div id="feedback-overlay" role="dialog" aria-modal="true" aria-labelledby="fb-title">
+    <div class="fb-card">
+      <div id="fb-title" class="fb-title"></div>
+      <div class="fb-image-wrap" id="fb-image-wrap" hidden>
+        <img id="fb-image" class="fb-image" alt="feedback image">
+      </div>
+      <div id="fb-text" class="fb-text"></div>
+      <button class="fb-close" id="fb-close" type="button">OK</button>
+      <audio id="fb-audio" preload="auto"></audio>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    // --- Чтение настроек из URL-параметров ---
+    const params = new URLSearchParams(location.search);
+    const FeedbackSettings = {
+      theme: params.get('theme') || 'witchy', // witchy|neon|dark|light|rainbow
+      mode:  params.get('fbMode') || 'both',  // text|image|both
+      title: params.get('fbTitle') || 'Well done!',
+      text:  params.get('fbText')  || 'Ты нашёл(а) все задания! Отличная работа!',
+      image: params.get('fbImage') || '',     // URL картинки (пусто = нет)
+      sound: params.get('fbSound') || 'open.mp3',
+      volume: clamp01(parseFloat(params.get('fbVolume') ?? '0.8')),
+      mute:  params.get('fbMute') === '1' ? true : false
+    };
+    function clamp01(n){ return isNaN(n) ? 0.8 : Math.max(0, Math.min(1, n)); }
+
+    const $overlay = document.getElementById('feedback-overlay');
+    const $title = document.getElementById('fb-title');
+    const $text  = document.getElementById('fb-text');
+    const $imgWrap = document.getElementById('fb-image-wrap');
+    const $img = document.getElementById('fb-image');
+    const $audio = document.getElementById('fb-audio');
+    const $btn = document.getElementById('fb-close');
+
+    $overlay.classList.add('theme-' + FeedbackSettings.theme);
+
+    function applyContent(){
+      $title.textContent = FeedbackSettings.title || '';
+      $text.textContent  = FeedbackSettings.text || '';
+      const showImage = (FeedbackSettings.mode === 'image' || FeedbackSettings.mode === 'both') && FeedbackSettings.image;
+      const showText  = (FeedbackSettings.mode === 'text'  || FeedbackSettings.mode === 'both');
+      $imgWrap.hidden = !showImage;
+      if (showImage) $img.src = FeedbackSettings.image;
+      $text.style.display = showText ? '' : 'none';
+      if (FeedbackSettings.sound && !FeedbackSettings.mute){
+        $audio.src = FeedbackSettings.sound;
+        $audio.volume = FeedbackSettings.volume;
+      } else {
+        $audio.removeAttribute('src');
+      }
+    }
+    function playSound(){
+      if ($audio.src) {
+        $audio.currentTime = 0;
+        $audio.play().catch(()=>{});
+      }
+    }
+    function openOverlay(){ applyContent(); $overlay.classList.add('active'); setTimeout(()=>{$btn.focus();},0); playSound(); }
+    function closeOverlay(){ $overlay.classList.remove('active'); }
+    $btn.addEventListener('click', closeOverlay);
+    document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') closeOverlay(); });
+
+    // Публичный API
+    window.Feedback = {
+      set(settings){ Object.assign(FeedbackSettings, settings || {}); },
+      show(settings){ if (settings) Object.assign(FeedbackSettings, settings); openOverlay(); }
+    };
+  })();
+  </script>
+  <!-- ---------- /Feedback module v2 ---------- -->
+
+  <script>
+    // -------------------
+    // Мини-логика пузырьков (как была по смыслу). Ничего лишнего.
+    // -------------------
+    const stage = document.getElementById('stage');
+    const taskEl = document.getElementById('task');
+    const counterEl = document.getElementById('counter');
+    const popSnd = document.getElementById('pop-audio');
+
+    const TASKS = [
+      'Say: This is a cat.',
+      'Fix: He don’t → He doesn’t.',
+      'Say: They are in the park.',
+      'Choose: in / on / under the table.',
+      'Make a question: Where ___ you live?',
+      'Say 3 toys you like.',
+      'Correct: She have → She has.',
+      'Say: It is blue. / They are blue.',
+      'Make 1 sentence in Present Simple.',
+      'Say: My favorite game is…'
+    ];
+
+    const BUBBLES = [];
+    let popped = 0;
+    const TOTAL = TASKS.length;
+
+    function rnd(min, max){ return Math.random() * (max - min) + min; }
+
+    function placeBubble(b, i){
+      const w = stage.clientWidth, h = stage.clientHeight;
+      const x = rnd(40, w - 120);
+      const y = rnd(80, h - 120);
+      b.style.left = x + 'px';
+      b.style.top  = y + 'px';
+      b.dataset.vx = (Math.random() < .5 ? -1 : 1) * rnd(0.2, 0.6);
+      b.dataset.vy = (Math.random() < .5 ? -1 : 1) * rnd(0.2, 0.6);
+      b.textContent = i + 1;
+    }
+
+    function spawnBubbles(){
+      for (let i=0;i<TOTAL;i++){
+        const b = document.createElement('div');
+        b.className = 'bubble';
+        placeBubble(b, i);
+        b.addEventListener('click', ()=>onPop(b, i));
+        stage.appendChild(b);
+        BUBBLES.push(b);
+      }
+      updateCounter();
+      taskEl.textContent = 'Кликай пузырёк → выполняй задание';
+    }
+
+    function updateCounter(){
+      counterEl.textContent = `${popped} / ${TOTAL}`;
+    }
+
+    function onPop(b, i){
+      // показать задание
+      taskEl.textContent = TASKS[i];
+
+      // звук + анимация
+      try { popSnd.currentTime = 0; popSnd.play().catch(()=>{}); } catch(e){}
+      b.classList.add('popped');
+
+      // убрать пузырёк
+      setTimeout(()=>{ b.remove(); }, 180);
+
+      popped++;
+      updateCounter();
+
+      if (popped >= TOTAL){
+        // финал — показать фидбек (настройки берутся из URL или можно задать программно)
+        window.Feedback.show(); // можно передать объект с {mode,title,text,image,sound...}
+      }
+    }
+
+    function tick(){
+      const w = stage.clientWidth, h = stage.clientHeight;
+      for (const b of BUBBLES){
+        if (!b.isConnected) continue;
+        let x = parseFloat(b.style.left), y = parseFloat(b.style.top);
+        let vx = parseFloat(b.dataset.vx), vy = parseFloat(b.dataset.vy);
+        x += vx; y += vy;
+        if (x < 0 || x > w - 80) { vx *= -1; x = Math.max(0, Math.min(w-80, x)); }
+        if (y < 60 || y > h - 80){ vy *= -1; y = Math.max(60, Math.min(h-80, y)); }
+        b.style.left = x + 'px'; b.style.top = y + 'px';
+        b.dataset.vx = vx; b.dataset.vy = vy;
+      }
+      requestAnimationFrame(tick);
+    }
+
+    window.addEventListener('resize', ()=>{
+      // лёгкая перекладка, чтобы не залипали
+      BUBBLES.forEach((b,i)=>{ if (b.isConnected) placeBubble(b,i); });
+    });
+
+    // старт
+    spawnBubbles();
+    tick();
+  </script>
+</body>
+</html>
